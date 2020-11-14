@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: An AWS Lambda application that calls the Lambda API.
+Resources:
+  api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: default
+      TracingEnabled: true
+      OpenApiVersion: 3.0.2
+  function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.7
+      CodeUri: function/.
+      Description: Call the AWS Lambda API
+      Timeout: 10
+      # Function's execution role
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaReadOnlyAccess
+        - AWSXrayWriteOnlyAccess
+      Tracing: Active
+      Events:
+        getEndpoint:
+          Type: Api
+          Properties:
+            RestApiId: !Ref stripe-checkout
+            Path: /
+            Method: GET
+      Layers:
+        - !Ref libs
+  libs:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: default
+      Description: Python 3 packages: stripe.
+      ContentUri: package/.
+      CompatibleRuntimes:
+        - python3.7
+        - python3.6
