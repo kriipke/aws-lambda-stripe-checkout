@@ -2,13 +2,13 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
 Description: An AWS Lambda application that calls the Lambda API.
 Resources:
-  api:
+  StripeTriggerApi:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: default
+      StageName: stripe
       TracingEnabled: true
       OpenApiVersion: 3.0.2
-  function:
+  StripeCheckoutFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: lambda_function.lambda_handler
@@ -22,12 +22,19 @@ Resources:
         - AWSLambdaReadOnlyAccess
         - AWSXrayWriteOnlyAccess
       Tracing: Active
+      Environment:
+        CANCEL_PAGE: !Ref CancelPage
+        DOMAIN: !Ref Domain
+        QUERY_PARAM: item_id
+        SECRET_ARN: !Ref StripeSecretDictKey
+        SECRET_DICT_KEY: !Ref StripeSecretArn
+        SUCCESS_PAGE: !Ref SuccessPage
       Events:
         getEndpoint:
           Type: Api
           Properties:
-            RestApiId: !Ref stripe-checkout
-            Path: /
+            RestApiId: !Ref StripeTriggerApi
+            Path: /checkout/product
             Method: GET
       Layers:
         - !Ref libs
@@ -39,4 +46,29 @@ Resources:
       ContentUri: package/.
       CompatibleRuntimes:
         - python3.7
-        - python3.6
+Parameters:
+  StripeSecretArn:
+    Description: ARN of the AWS KMS key holding your Stripe API key
+    Type: String
+  StripeSecretDictKey:
+    Description: Dictionary key that will yeild the value of your Stripe API key within the KMS Secret giving in StripeSecretArn (e.g. "stripe_secret_key")
+    Type: String
+  SuccessPage:
+    Description: Path of the page to be re-directed to upon successful checkout (relative to the value given in Domain), e.g. "/store/thank_you.html"
+    Type: String
+    Pattern: '/.*'
+  CancelPage:
+    Description: Path of the page to be re-directed to upon canceling the checkout (relative to the value given in Domain), e.g. "/store/product_123.html"
+    Type: String
+    Pattern: '/.*'
+  Domain:
+    Description: Domain associated with the Success & Cancel re-direct pages.
+    Type: String
+
+Outputs:
+  StripeCheckoutLambda:
+    Description: Stripe Checkout Lambda Function
+    Value: !Ref StripeCheckoutFunction
+  StripeTriggerApi:
+    Description: AWS API Gateway that will trigger StripeCheckoutLambda
+    Value: !Ref StripeTriggerApi

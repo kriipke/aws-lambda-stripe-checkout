@@ -1,3 +1,4 @@
+import os
 import logging
 import boto3
 import stripe
@@ -6,37 +7,30 @@ import json
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-domain = "http://localhost:1313"
 client = boto3.client("secretsmanager")
 keys = json.loads(
     client.get_secret_value(
-        SecretId="arn:aws:secretsmanager:us-east-1:148633485533:secret:dev/msp/stripe-KxWNIM",
+        SecretId = os.environ["SECRET_ARN"],
     )["SecretString"]
 )
 
-
 def lambda_handler(event, context):
     try:
-        stripe.api_key = keys["stripe-secret"]
+        stripe.api_key = keys[os.environ["SECRET_DICT_KEY"]]
+        price_id = event['queryStringParameters'][os.environ["QUERY_PARAM"]]
+
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[
                 {
-                    "price_data": {
-                        "currency": "usd",
-                        "unit_amount": 2000,
-                        "product_data": {
-                            "name": "Stubborn Attachments",
-                            "images": ["https://i.imgur.com/EHyR2nP.png"],
-                        },
-                    },
-                    "quantity": 1,
+                  "price": "price_" + price_id,
+                  "quantity": 1,
                 },
             ],
             mode="payment",
-            success_url=domain + "/#coach",
-            cancel_url=domain + "/#about",
+            success_url= os.environ['DOMAIN'] + os.environ['SUCCESS_PAGE'],
+            cancel_url= os.environ['DOMAIN'] + os.environ['CANCEL_PAGE'],
         )
-        return json.dumps({"id": checkout_session.id})
+        return {"id": checkout_session.id}
     except Exception as e:
-        return json.dumps({"error": str(e), "response": "403"})
+        return {"error": str(e), "response": "403"}
